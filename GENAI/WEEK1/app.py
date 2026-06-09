@@ -47,6 +47,13 @@ GEMINI_MODELS = [
     "gemini-2.0-flash",
 ]
 
+GROQ_MODELS = [
+    "llama-3.3-70b-versatile",
+    "llama-3.1-70b-versatile",
+    "llama3-70b-8192",
+    "mixtral-8x7b-32768",
+]
+
 MIME_TYPES = {
     ".html": "text/html; charset=utf-8",
     ".css":  "text/css; charset=utf-8",
@@ -98,24 +105,29 @@ class DeluluTracksHandler(BaseHTTPRequestHandler):
 
             query   = (body.get("query") or "").strip()
             client_key = (body.get("apiKey") or "").strip()
+            provider = (body.get("apiProvider") or "gemini").strip().lower()
 
             if client_key:
                 api_key = client_key
             else:
                 if DEFAULT_KEY_USAGE_COUNT >= DEFAULT_KEY_USAGE_LIMIT:
                     return self._send_json({
-                        "error": "The default Gemini API Key has reached its 5-use limit. Please configure a custom Gemini API Key in the settings."
+                        "error": "The default Gemini API Key has reached its 5-use limit. Please configure a custom API Key in the settings."
                     }, 403)
                 DEFAULT_KEY_USAGE_COUNT += 1
                 api_key = DEFAULT_API_KEY
+                provider = "gemini"
 
             if not query:
                 return self._send_json({"error": "Query is required"}, 400)
             if not api_key:
-                return self._send_json({"error": "Gemini API Key is required"}, 400)
+                return self._send_json({"error": f"{provider.capitalize()} API Key is required"}, 400)
 
             try:
-                result = call_gemini(query, api_key)
+                if provider == "groq":
+                    result = call_groq(query, api_key)
+                else:
+                    result = call_gemini(query, api_key)
                 self._send_json(result)
             except Exception as ex:
                 self._send_json({"error": str(ex)}, 500)
@@ -132,6 +144,7 @@ class DeluluTracksHandler(BaseHTTPRequestHandler):
             message = (body.get("message") or "").strip()
             history = body.get("history") or []
             client_key = (body.get("apiKey") or "").strip()
+            provider = (body.get("apiProvider") or "gemini").strip().lower()
 
             if not song or not song.get("title") or not song.get("artist"):
                 return self._send_json({"error": "Song details (title and artist) are required"}, 400)
@@ -143,16 +156,20 @@ class DeluluTracksHandler(BaseHTTPRequestHandler):
             else:
                 if DEFAULT_KEY_USAGE_COUNT >= DEFAULT_KEY_USAGE_LIMIT:
                     return self._send_json({
-                        "error": "The default Gemini API Key has reached its 5-use limit. Please configure a custom Gemini API Key in the settings."
+                        "error": "The default Gemini API Key has reached its 5-use limit. Please configure a custom API Key in the settings."
                     }, 403)
                 DEFAULT_KEY_USAGE_COUNT += 1
                 api_key = DEFAULT_API_KEY
+                provider = "gemini"
 
             if not api_key:
-                return self._send_json({"error": "Gemini API Key is required"}, 400)
+                return self._send_json({"error": f"{provider.capitalize()} API Key is required"}, 400)
 
             try:
-                result = call_gemini_chat(song, message, history, api_key)
+                if provider == "groq":
+                    result = call_groq_chat(song, message, history, api_key)
+                else:
+                    result = call_gemini_chat(song, message, history, api_key)
                 self._send_json(result)
             except Exception as ex:
                 self._send_json({"error": str(ex)}, 500)
@@ -348,6 +365,144 @@ def call_gemini_chat(song: dict, message: str, history: list, api_key: str) -> d
                 print(f"  ✗ {model} chat exception: {ex}")
                 break
     raise RuntimeError(f"All models failed for chat. Last error: {last_err}")
+
+def call_groq(query: str, api_key: str) -> dict:
+    prompt = (
+        f"You are the music brain of DeluluTracks', a premium AI music app.\n"
+        f'The user described: "{query}"\n'
+        f'Pick exactly 6 real, well-known songs that perfectly match this feeling or situation.\n'
+        f'Mix genres and languages freely (English, Hindi, Tamil, etc.).\n'
+        f'Provide your output in JSON format with two keys: "summary" (a string summarizing the mood match) '
+        f'and "songs" (an array of song objects, each with "title", "artist", "why", "yt_query").'
+    )
+
+    last_err = "Unknown error"
+
+    for model in GROQ_MODELS:
+        payload = {
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+            "response_format": {"type": "json_object"},
+            "temperature": 0.85
+        }
+
+        for attempt in range(3):
+            try:
+                req = urllib.request.Request(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    data=json.dumps(payload).encode("utf-8"),
+                    headers={
+                        "Content-Type": "application/json",
+                        "Authorization": f"Bearer {api_key}"
+                    },
+                    method="POST"
+                )
+                with urllib.request.urlopen(req, timeout=30) as res:
+                    resp = json.loads(res.read().decode("utf-8"))
+
+                content = resp["choices"][0]["message"]["content"]
+                result = json.loads(content.strip())
+                print(f"  ✓ Groq {model} responded (attempt {attempt + 1})")
+                return result
+
+            except urllib.error.HTTPError as e:
+                try:
+                    err_body = json.loads(e.read().decode())
+                    last_err = err_body.get("error", {}).get("message", str(e))
+                except Exception:
+                    last_err = f"HTTP {e.code}"
+
+                if e.code in (429, 503):
+                    wait = 2 ** attempt
+                    print(f"  ⚠ Groq {model} overloaded (attempt {attempt + 1}), retrying in {wait}s…")
+                    time.sleep(wait)
+                    continue
+
+                if e.code == 404:
+                    print(f"  ✗ Groq {model} model not available, trying next…")
+                    break
+
+                raise RuntimeError(last_err)
+
+            except Exception as ex:
+                last_err = str(ex)
+                print(f"  ✗ Groq {model} exception: {ex}")
+                break
+
+    raise RuntimeError(f"All Groq models failed. Last error: {last_err}")
+
+def call_groq_chat(song: dict, message: str, history: list, api_key: str) -> dict:
+    system_context = (
+        f"You are the music expert companion for the app DeluluTracks.\n"
+        f"The user wants to chat and get more details about the song: '{song['title']}' by '{song['artist']}'.\n"
+        f"Answer the user's questions about this song. Provide release year, album/movie it belongs to, "
+        f"how popular it is, chart achievements, behind-the-scenes stories, and other interesting trivia.\n"
+        f"Keep your responses friendly, extremely engaging, and formatted in clear, concise paragraphs (using markdown bullet points or bold text if helpful). "
+        f"Do not write overly long essays. Act as a conversational chat partner."
+    )
+
+    messages = [{"role": "system", "content": system_context}]
+
+    for turn in history:
+        messages.append({
+            "role": "user" if turn.get("role") == "user" else "assistant",
+            "content": turn.get("text", "")
+        })
+
+    messages.append({"role": "user", "content": message})
+
+    last_err = "Unknown error"
+
+    for model in GROQ_MODELS:
+        payload = {
+            "model": model,
+            "messages": messages,
+            "temperature": 0.7
+        }
+
+        for attempt in range(3):
+            try:
+                req = urllib.request.Request(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    data=json.dumps(payload).encode("utf-8"),
+                    headers={
+                        "Content-Type": "application/json",
+                        "Authorization": f"Bearer {api_key}"
+                    },
+                    method="POST"
+                )
+                with urllib.request.urlopen(req, timeout=30) as res:
+                    resp = json.loads(res.read().decode("utf-8"))
+
+                text = resp["choices"][0]["message"]["content"]
+                print(f"  ✓ Groq {model} chat responded (attempt {attempt + 1})")
+                return {"response": text}
+
+            except urllib.error.HTTPError as e:
+                try:
+                    err_body = json.loads(e.read().decode())
+                    last_err = err_body.get("error", {}).get("message", str(e))
+                except Exception:
+                    last_err = f"HTTP {e.code}"
+
+                if e.code in (429, 503):
+                    wait = 2 ** attempt
+                    print(f"  ⚠ Groq {model} chat overloaded (attempt {attempt + 1}), retrying in {wait}s…")
+                    time.sleep(wait)
+                    continue
+
+                if e.code == 404:
+                    print(f"  ✗ Groq {model} chat model not available, trying next…")
+                    break
+
+                raise RuntimeError(last_err)
+
+            except Exception as ex:
+                last_err = str(ex)
+                print(f"  ✗ Groq {model} chat exception: {ex}")
+                break
+
+    raise RuntimeError(f"All Groq chat models failed. Last error: {last_err}")
 
 def get_youtube_video_id(query: str):
     try:

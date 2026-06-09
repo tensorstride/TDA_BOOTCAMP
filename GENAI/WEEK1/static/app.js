@@ -1,6 +1,7 @@
 
 let tracks = [], cur = -1, ytPlayer = null, ytReady = false, playing = false, ticker = null;
-let apiKey = '';
+let apiKey = localStorage.getItem('delulu_key') || '';
+let apiProvider = localStorage.getItem('delulu_provider') || 'gemini';
 let transitioned = false;
 let searchHistory = [];
 let vidCandidateIndex = 0;  
@@ -111,16 +112,57 @@ function fill(text) {
   go();
 }
 
-function openModal()  { document.getElementById('modalBg').classList.add('open'); document.getElementById('apiKeyInput').focus(); }
+function openModal()  {
+  document.getElementById('modalBg').classList.add('open');
+  selectProvider(apiProvider);
+  document.getElementById('apiKeyInput').value = apiKey;
+  document.getElementById('apiKeyInput').focus();
+}
 function closeModal() { document.getElementById('modalBg').classList.remove('open'); }
-function openHelpModal() { document.getElementById('helpModalBg').classList.add('open'); }
+function openHelpModal() {
+  document.getElementById('helpModalBg').classList.add('open');
+  showHelpTab(apiProvider);
+}
 function closeHelpModal() { document.getElementById('helpModalBg').classList.remove('open'); }
+
+function selectProvider(p) {
+  apiProvider = p;
+  const geminiBtn = document.getElementById('providerGemini');
+  const groqBtn = document.getElementById('providerGroq');
+  if (geminiBtn) geminiBtn.classList.toggle('active', p === 'gemini');
+  if (groqBtn) groqBtn.classList.toggle('active', p === 'groq');
+  
+  const labelEl = document.getElementById('apiKeyLabel');
+  const inputEl = document.getElementById('apiKeyInput');
+  if (p === 'gemini') {
+    if (labelEl) labelEl.textContent = 'Gemini API Key';
+    if (inputEl) inputEl.placeholder = 'AIza...';
+  } else {
+    if (labelEl) labelEl.textContent = 'Groq API Key';
+    if (inputEl) inputEl.placeholder = 'gsk_...';
+  }
+}
+
+function showHelpTab(p) {
+  const geminiHelpTab = document.getElementById('tabHelpGemini');
+  const groqHelpTab = document.getElementById('tabHelpGroq');
+  if (geminiHelpTab) geminiHelpTab.classList.toggle('active', p === 'gemini');
+  if (groqHelpTab) groqHelpTab.classList.toggle('active', p === 'groq');
+  
+  const geminiContent = document.getElementById('helpContentGemini');
+  const groqContent = document.getElementById('helpContentGroq');
+  if (geminiContent) geminiContent.style.display = p === 'gemini' ? 'block' : 'none';
+  if (groqContent) groqContent.style.display = p === 'groq' ? 'block' : 'none';
+}
+
 function saveKey() {
   const k = document.getElementById('apiKeyInput').value.trim();
   if (!k) { toast('Please enter a key'); return; }
   apiKey = k;
+  localStorage.setItem('delulu_key', k);
+  localStorage.setItem('delulu_provider', apiProvider);
   closeModal();
-  toast('API key saved ✓');
+  toast(`${apiProvider === 'gemini' ? 'Gemini' : 'Groq'} key saved ✓`);
 }
 
 function doTransition() {
@@ -279,7 +321,7 @@ async function callBackend(q) {
   const res = await fetch('/api/search', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query: q, apiKey: apiKey })
+    body: JSON.stringify({ query: q, apiKey: apiKey, apiProvider: apiProvider })
   });
   if (!res.ok) {
     const err = await res.json();
@@ -872,7 +914,8 @@ async function callChatAPI(song, message, history) {
       song: { title: song.title, artist: song.artist },
       message: message,
       history: history,
-      apiKey: apiKey
+      apiKey: apiKey,
+      apiProvider: apiProvider
     })
   });
   if (!res.ok) {

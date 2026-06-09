@@ -182,11 +182,18 @@
 
 <div class="modal-bg" id="modalBg" onclick="if(event.target===this)closeModal()">
   <div class="modal">
-    <h3>Gemini API Key</h3>
-    <p>Get 5 free searches with our default server key. After that, please enter your own Gemini API Key below.</p>
-    <p style="font-size: 11px; color: var(--text3); margin-top: 4px;">Your key is stored locally in this browser and never shared.</p>
-    <label>API Key</label>
+    <h3>API Key Settings</h3>
+    <p>Get 5 free searches with our default server key. After that, please select your provider and enter your API Key below.</p>
+    
+    <label style="margin-bottom: 8px;">Provider</label>
+    <div class="provider-select">
+      <button class="provider-btn active" id="providerGemini" onclick="selectProvider('gemini')">Gemini</button>
+      <button class="provider-btn" id="providerGroq" onclick="selectProvider('groq')">Groq</button>
+    </div>
+
+    <label id="apiKeyLabel">Gemini API Key</label>
     <input type="password" id="apiKeyInput" placeholder="AIza..."/>
+    <p style="font-size: 11px; color: var(--text3); margin-top: 4px;">Your key is stored locally in this browser and never shared.</p>
     <div class="modal-btns">
       <button class="btn-ghost" style="margin-right: auto;" onclick="openHelpModal()">How to get API Key</button>
       <button class="btn-ghost" onclick="closeModal()">Cancel</button>
@@ -197,8 +204,14 @@
 
 <div class="modal-bg" id="helpModalBg" onclick="if(event.target===this)closeHelpModal()">
   <div class="modal" style="width: 500px; max-width: 95vw;">
-    <h3>How to get Gemini API Key</h3>
-    <div class="help-content" style="font-size: 13px; color: var(--text2); line-height: 1.6; margin: 16px 0; text-align: left; max-height: 55vh; overflow-y: auto; padding-right: 8px;">
+    <h3>How to get API Key</h3>
+    
+    <div class="help-tabs">
+      <button class="help-tab active" id="tabHelpGemini" onclick="showHelpTab('gemini')">Gemini</button>
+      <button class="help-tab" id="tabHelpGroq" onclick="showHelpTab('groq')">Groq</button>
+    </div>
+
+    <div class="help-content" id="helpContentGemini" style="font-size: 13px; color: var(--text2); line-height: 1.6; margin: 16px 0; text-align: left; max-height: 55vh; overflow-y: auto; padding-right: 8px;">
       <h4 style="color: var(--text); margin-top: 12px; margin-bottom: 4px;">1. Sign In to Google AI Studio</h4>
       <p style="margin-bottom: 8px;">Open your browser and navigate to <a href="https://aistudio.google.com/app/api-keys" target="_blank" style="color: var(--green); text-decoration: underline;">Google AI Studio</a>.</p>
       <p style="margin-bottom: 8px;">Log in using your standard Google/Gmail account.</p>
@@ -214,6 +227,20 @@
       <h4 style="color: var(--text); margin-top: 12px; margin-bottom: 4px;">3. Copy and Secure Your Key</h4>
       <p style="margin-bottom: 12px;">Click the <strong>Copy</strong> icon next to the generated string to save it to your clipboard.</p>
     </div>
+
+    <div class="help-content" id="helpContentGroq" style="display: none; font-size: 13px; color: var(--text2); line-height: 1.6; margin: 16px 0; text-align: left; max-height: 55vh; overflow-y: auto; padding-right: 8px;">
+      <h4 style="color: var(--text); margin-top: 12px; margin-bottom: 4px;">1. Sign In to Groq Console</h4>
+      <p style="margin-bottom: 8px;">Open your browser and navigate to <a href="https://console.groq.com/keys" target="_blank" style="color: var(--green); text-decoration: underline;">Groq Console</a>.</p>
+      <p style="margin-bottom: 8px;">Log in using your Groq account (or create a new one).</p>
+      
+      <h4 style="color: var(--text); margin-top: 12px; margin-bottom: 4px;">2. Create API Key</h4>
+      <p style="margin-bottom: 8px;">Click the <strong>Create API Key</strong> button on the dashboard.</p>
+      <p style="margin-bottom: 8px;">Provide a descriptive name for your key and click <strong>Submit</strong>.</p>
+      
+      <h4 style="color: var(--text); margin-top: 12px; margin-bottom: 4px;">3. Copy and Secure Your Key</h4>
+      <p style="margin-bottom: 12px;">Copy the generated string (starts with <strong>gsk_</strong>) and paste it into Settings.</p>
+    </div>
+
     <div class="modal-btns">
       <button class="btn-solid" onclick="closeHelpModal()">Got it</button>
     </div>

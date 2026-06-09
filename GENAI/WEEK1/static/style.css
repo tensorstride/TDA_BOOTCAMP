@@ -1068,3 +1068,39 @@ body {
   0% { left: -40%; }
   100% { left: 100%; }
 }
+
+/* ── Segmented Provider & Help Toggles ── */
+.provider-select, .help-tabs {
+  display: flex;
+  background: var(--bg3);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 4px;
+  margin-top: 6px;
+  margin-bottom: 20px;
+}
+.provider-btn, .help-tab {
+  flex: 1;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  padding: 8px;
+  font-size: 13px;
+  color: var(--text2);
+  cursor: pointer;
+  transition: all 0.2s var(--ease);
+  font-weight: 500;
+  text-align: center;
+}
+.provider-btn.active, .help-tab.active {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+.provider-btn:hover, .help-tab:hover {
+  color: var(--text);
+}
+
+.help-tabs {
+  margin-bottom: 24px;
+}
